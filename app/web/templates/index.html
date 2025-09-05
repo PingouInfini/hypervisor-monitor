@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block tab_vms %}
+<table id="vms-table" class="display">
+  <thead>
+    <tr>
+      <th>VM</th>
+      <th>Hostname</th>
+      <th>IP</th>
+      <th>RAM (MB)</th>
+      <th>VHD total (GB)</th>
+      <th>Fichier VHD (GB)</th>
+      <th>Host</th>
+      <th>Vu</th>
+    </tr>
+  </thead>
+  <tbody id="vms-body">
+  </tbody>
+</table>
+{% endblock %}
+
+{% block tab_hosts %}
+<div id="hosts-grid" class="hosts-grid">
+  <!-- rempli côté client -->
+</div>
+{% endblock %}

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hyper-V Monitor</title>
+  <link rel="stylesheet" href="/static/vendor/pico.min.css">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/vendor/jquery-3.7.1.min.js"></script>
+  <!-- DataTables -->
+  <link rel="stylesheet" href="/static/vendor/dataTables.dataTables.min.css">
+  <script src="/static/vendor/htmx.min.js"></script>
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Hyper‑V Monitor</h1>
+      <nav>
+        <ul>
+          <li><a href="#" id="tab-vms" class="tab active" data-target="pane-vms">VMs</a></li>
+          <li><a href="#" id="tab-hosts" class="tab" data-target="pane-hosts">Hosts</a></li>
+          <li><button id="refresh-btn" class="contrast outline">Rafraîchir maintenant</button></li>
+        </ul>
+      </nav>
+    </header>
+    <section id="pane-vms" class="pane active">
+      {% block tab_vms %}{% endblock %}
+    </section>
+    <section id="pane-hosts" class="pane">
+      {% block tab_hosts %}{% endblock %}
+    </section>
+  </main>
+  <script src="/static/vendor/dataTables.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
