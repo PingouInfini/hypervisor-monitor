@@ -4,6 +4,9 @@ import logging
 import os
 from typing import List
 
+from sqlalchemy import select
+
+from . import models
 from .config import settings
 from .crud import upsert_host, upsert_vm
 from .db import SessionLocal
@@ -29,7 +32,8 @@ def get_client(host: str) -> HyperVClient:
     return HyperVClient(host, cfg)
 
 
-async def collect_once(hosts: List[str] | None = None):
+def collect_once_sync(hosts: List[str] | None = None):
+    """Version synchrone : appelée dans un thread via asyncio.to_thread"""
     if hosts is None:
         hosts = settings.hosts
     for h in hosts:
@@ -37,25 +41,28 @@ async def collect_once(hosts: List[str] | None = None):
         try:
             client = get_client(h)
             data = client.collect()
-            logger.debug(f"Successfully connected to {h} via WinRM")
+            logger.debug(f"Successfully connected to {h}")
         except Exception as e:
             logger.error(f"Failed to collect from host {h}: {e}")
             # On échec, on persiste au moins le host avec valeurs nulles
             db = SessionLocal()
-            upsert_host(db, h, ip=None, free_disk_gb=None, free_mem_mb=None)
-            db.close()
+            try:
+                upsert_host(db, h, ip=None, free_disk_gb=None, free_mem_mb=None)
+            finally:
+                db.close()
             continue
 
         db = SessionLocal()
         try:
             host_row = upsert_host(
                 db,
-                h,
+                name=data.get("host_name"),
                 ip=data.get("host_ip"),
                 free_disk_gb=data.get("host_free_disk_gb"),
                 free_mem_mb=data.get("host_free_mem_mb"),
             )
             vms = data.get("vms", [])
+            seen_names = set()
             if vms:
                 logger.debug(f"Host {h}: found {len(vms)} VMs")
 
@@ -64,19 +71,38 @@ async def collect_once(hosts: List[str] | None = None):
                     if isinstance(ip, dict):
                         ip = json.dumps(ip)
 
+                    name = vm.get("name")
+                    seen_names.add(name)
+
                     logger.debug(f"Processing VM '{vm.get('name')}' on host {h}")
                     upsert_vm(
                         db,
                         host_id=host_row.id,
-                        name=vm.get("name"),
+                        name=name,
                         ip=ip,
                         guest_hostname=vm.get("vm_hostname"),
                         ram_mb=vm.get("ram_mb"),
                         total_vhd_gb=vm.get("total_vhd_gb"),
                         total_vhd_file_gb=vm.get("total_vhd_file_gb"),
                     )
+
+            # --- suppression des VMs disparues ---
+            if seen_names:
+                q = select(models.VM).where(models.VM.host_id == host_row.id)
+                db_vms = db.execute(q).scalars().all()
+                for db_vm in db_vms:
+                    if db_vm.name not in seen_names:
+                        logger.info(f"Removing VM '{db_vm.name}' (no longer present on host {h})")
+                        db.delete(db_vm)
+
+            db.commit()
         finally:
             db.close()
+
+
+async def collect_once(hosts: List[str] | None = None):
+    """Version asynchrone : exécute la collecte synchrone dans un thread"""
+    await asyncio.to_thread(collect_once_sync, hosts)
 
 
 async def polling_loop():

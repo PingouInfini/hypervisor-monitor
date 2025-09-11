@@ -45,6 +45,9 @@ class HyperVClient:
         ps = r'''
 $ProgressPreference = 'SilentlyContinue'
 
+# Host name
+$hostName = (Get-ComputerInfo -Property CsName).CsName
+
 # Host IP
 $hostIP = (Get-NetIPAddress -AddressFamily IPv4 |
     Where-Object { $_.IPAddress -notlike '169.*' -and $_.IPAddress -notlike '127.*' } |
@@ -61,15 +64,36 @@ $freeDiskGB = [math]::Round((($fixed | Measure-Object -Property FreeSpace -Sum).
 # VMs
 $vms = Get-VM | ForEach-Object {
     $vm = $_
+
+    # On remplace [ et ] par * uniquement pour les commandes Hyper-V
+    $safeName = $vm.Name -replace '\[','*' -replace '\]','*'
+
     $ip = $null
     try {
-        $adp = Get-VMNetworkAdapter -VMName $vm.Name
+        $adp = Get-VMNetworkAdapter -VMName $safeName
         $ip = $adp.IPAddresses | Where-Object { $_ -match '^\d{1,3}(\.\d{1,3}){3}$' -and $_ -notlike '169.*' } | Select-Object -First 1
     } catch { $ip = $null }
 
+    # Récupération du hostname invité via KVP Exchange
+    $vmHostName = $null
+    try {
+        $kvp = Get-VMIntegrationService -VMName $safeName -Name "Key-Value Pair Exchange"
+        if ($kvp.Enabled) {
+            $kvpItems = Get-VMKeyValuePair -VMName $safeName -Source Guest
+            $vmHostName = ($kvpItems | Where-Object { $_.Name -eq "HostName" }).Value
+        }
+    } catch { $vmHostName = $null }
+
+    if (-not $vmHostName -and $ip) {
+        try {
+            # Fallback: reverse DNS sur l'adresse IP
+            $vmHostName = [System.Net.Dns]::GetHostEntry($ip).HostName
+        } catch { $vmHostName = $null }
+    }
+
     $vhdInfo = @()
     try {
-        $vhdInfo = Get-VMHardDiskDrive -VMName $vm.Name | ForEach-Object {
+        $vhdInfo = Get-VMHardDiskDrive -VMName $safeName | ForEach-Object {
             $vhd = Get-VHD -Path $_.Path
             [pscustomobject]@{
                 Path = $vhd.Path
@@ -84,7 +108,7 @@ $vms = Get-VM | ForEach-Object {
 
     [pscustomobject]@{
         name = $vm.Name
-        vm_hostname = $null       # peut nécessiter KVP/PSDirect pour être fiable
+        vm_hostname = $vmHostName
         ip = $ip
         ram_mb = [int]($vm.MemoryStartup / 1MB)
         total_vhd_gb = $totalVhdGB
@@ -93,6 +117,7 @@ $vms = Get-VM | ForEach-Object {
 }
 
 $result = [pscustomobject]@{
+    host_name = $hostName
     host_ip = $hostIP
     host_free_mem_mb = $freeMemMB
     host_free_disk_gb = $freeDiskGB
