@@ -22,9 +22,9 @@ async function fetchJSON(url) {
 }
 
 function fmtDate(s) {
-  if (!s) return '';
+  if (!s) return 'Jamais';
   const d = new Date(s);
-  return d.toLocaleString();
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' - ' + d.toLocaleDateString();
 }
 
 async function loadVMs() {
@@ -32,21 +32,24 @@ async function loadVMs() {
   const tbody = document.getElementById('vms-body');
   tbody.innerHTML = '';
   data.forEach(vm => {
+    const isUp = !!vm.ip;
+    const statusHtml = `<span class="status-dot ${isUp ? 'up' : 'down'}" title="${isUp ? 'UP' : 'DOWN'}"></span>`;
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${vm.name}</td>
-      <td>${vm.guest_hostname || ''}</td>
-      <td>${vm.ip || ''}</td>
-      <td>${vm.ram_mb ?? ''}</td>
-      <td>${vm.total_vhd_gb ?? ''}</td>
-      <td>${vm.total_vhd_file_gb ?? ''}</td>
+      <td>${statusHtml} &nbsp; ${vm.name}</td>
+      <td>${vm.guest_hostname || '<span class="text-muted">—</span>'}</td>
+      <td style="font-family: monospace;">${vm.ip || '<span class="text-muted">—</span>'}</td>
+      <td>${vm.ram_mb ? vm.ram_mb + ' MB' : '—'}</td>
+      <td>${vm.total_vhd_gb ? vm.total_vhd_gb + ' GB' : '—'}</td>
+      <td>${vm.total_vhd_file_gb ? vm.total_vhd_file_gb + ' GB' : '—'}</td>
       <td class="host-name" data-host-id="${vm.host_id}"></td>
-      <td class="small">${fmtDate(vm.last_seen)}</td>
+      <td style="font-size: 0.85rem; color: #94a3b8;">${fmtDate(vm.last_seen)}</td>
     `;
     tbody.appendChild(tr);
   });
 
-  // Resolve host names for each VM row
+  // Résolution des noms d'hôtes pour le tableau
   const hosts = await fetchJSON('/api/hosts');
   const hostMap = {};
   hosts.forEach(h => hostMap[h.id] = h.name);
@@ -59,33 +62,87 @@ async function loadVMs() {
   if (window._dt) {
     window._dt.destroy();
   }
-  window._dt = new DataTable('#vms-table', { responsive: true, pageLength: 25 });
+  window._dt = new DataTable('#vms-table', {
+    responsive: true,
+    pageLength: 25,
+    language: { search: "Rechercher :", lengthMenu: "Afficher _MENU_ VMs" }
+  });
 }
 
 async function loadHosts() {
   const hosts = await fetchJSON('/api/hosts');
   const grid = document.getElementById('hosts-grid');
   grid.innerHTML = '';
+
   for (const h of hosts) {
-    // Load host detail to fetch VMs
     const detail = await fetchJSON('/api/hosts/' + h.id);
+    const vms = detail.vms || [];
+
+    // Trier les VMs : Les allumées (avec IP) d'abord
+    vms.sort((a, b) => (b.ip ? 1 : 0) - (a.ip ? 1 : 0));
+
+    const vmsHtml = vms.map(vm => {
+      const isUp = !!vm.ip;
+      return `
+        <div class="vm-row">
+          <div class="vm-info">
+            <span class="status-dot ${isUp ? 'up' : 'down'}"></span>
+            <span class="vm-name">${vm.name}</span>
+          </div>
+          <span class="vm-ip">${vm.ip || 'Hors ligne'}</span>
+        </div>
+      `;
+    }).join('');
+
     const card = document.createElement('div');
     card.className = 'host-card';
     card.innerHTML = `
-      <h3>${h.name}</h3>
-      <p class="small">IP: ${h.ip || ''} • RAM libre: ${h.free_mem_mb ?? ''} MB • Disque libre: ${h.free_disk_gb ?? ''} GB</p>
-      <p class="small">Vu: ${fmtDate(h.last_seen)}</p>
-      <div>${(detail.vms || []).map(vm => `<span class="vm-chip">${vm.name} (${vm.ip || '—'})</span>`).join('')}</div>
+      <div class="host-header">
+        <div>
+          <h3>🖥️ ${h.name}</h3>
+          <div class="host-meta">${h.ip || 'IP Inconnue'}</div>
+        </div>
+        <div class="host-meta" style="text-align: right;">
+          <div>Vu à</div>
+          <div>${fmtDate(h.last_seen)}</div>
+        </div>
+      </div>
+
+      <div class="host-stats">
+        <div class="stat-box">
+          <span class="stat-label">RAM Libre</span>
+          <span class="stat-value">${h.free_mem_mb ? h.free_mem_mb + ' MB' : 'N/A'}</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Stockage Libre</span>
+          <span class="stat-value">${h.free_disk_gb ? h.free_disk_gb + ' GB' : 'N/A'}</span>
+        </div>
+      </div>
+
+      <div class="vm-list">
+        <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 4px; padding-left: 4px;">Machines Virtuelles (${vms.length})</div>
+        ${vmsHtml || '<div class="vm-row" style="justify-content: center; color: #94a3b8;">Aucune VM détectée</div>'}
+      </div>
     `;
     grid.appendChild(card);
   }
 }
 
 async function refreshAll() {
+  const btn = document.getElementById('refresh-btn');
+  btn.setAttribute('aria-busy', 'true');
+  btn.textContent = 'Actualisation...';
+
   try {
     await fetch('/api/refresh', { method: 'POST' });
-  } catch (e) { console.error(e); }
+  } catch (e) {
+    console.error(e);
+  }
+
   await Promise.all([loadVMs(), loadHosts()]);
+
+  btn.removeAttribute('aria-busy');
+  btn.textContent = '↻ Actualiser';
 }
 
 document.getElementById('refresh-btn').addEventListener('click', refreshAll);

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,30 +7,35 @@
   <link rel="stylesheet" href="/static/vendor/pico.min.css">
   <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/vendor/jquery-3.7.1.min.js"></script>
-  <!-- DataTables -->
   <link rel="stylesheet" href="/static/vendor/dataTables.dataTables.min.css">
   <script src="/static/vendor/htmx.min.js"></script>
 </head>
 <body>
-  <main class="container">
-    <header>
+<main class="container">
+  <header class="app-header">
+    <div class="brand">
+      <div class="logo-dot"></div>
       <h1>Hyper‑V Monitor</h1>
-      <nav>
-        <ul>
-          <li><a href="#" id="tab-vms" class="tab active" data-target="pane-vms">VMs</a></li>
-          <li><a href="#" id="tab-hosts" class="tab" data-target="pane-hosts">Hosts</a></li>
-          <li><button id="refresh-btn" class="contrast outline">Rafraîchir maintenant</button></li>
-        </ul>
-      </nav>
-    </header>
-    <section id="pane-vms" class="pane active">
-      {% block tab_vms %}{% endblock %}
-    </section>
-    <section id="pane-hosts" class="pane">
-      {% block tab_hosts %}{% endblock %}
-    </section>
-  </main>
-  <script src="/static/vendor/dataTables.min.js"></script>
-  <script src="/static/app.js"></script>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="#" id="tab-hosts" class="tab active" data-target="pane-hosts">Vue Hosts</a></li>
+        <li><a href="#" id="tab-vms" class="tab" data-target="pane-vms">Toutes les VMs</a></li>
+        <li><button id="refresh-btn" class="contrast outline">↻ Actualiser</button></li>
+      </ul>
+    </nav>
+  </header>
+
+  <section id="pane-hosts" class="pane active">
+    {% block tab_hosts %}{% endblock %}
+  </section>
+
+  <section id="pane-vms" class="pane">
+    {% block tab_vms %}{% endblock %}
+  </section>
+</main>
+
+<script src="/static/vendor/dataTables.min.js"></script>
+<script src="/static/app.js"></script>
 </body>
 </html>
