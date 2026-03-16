@@ -43,9 +43,10 @@ async function loadVMs() {
     const isUp = vm.state === 'Running';
     const statusHtml = `<span class="status-dot ${isUp ? 'up' : 'down'}" title="${vm.state}"></span>`;
 
-    // IP en italique si éteinte, ou un tiret si on ne l'a jamais eue
     let displayIp = '<span class="text-muted">—</span>';
-    if (vm.ip) {
+    const validIp = vm.ip && vm.ip !== '{}' && vm.ip !== 'null';
+
+    if (validIp) {
         displayIp = isUp ? vm.ip : `<i class="text-muted">${vm.ip}</i>`;
     }
 
@@ -96,11 +97,13 @@ async function loadHosts() {
 
     const vmsHtml = vms.map(vm => {
       const isUp = vm.state === 'Running';
-      let displayIp = vm.ip || vm.state;
-      if (!isUp && vm.ip) displayIp = `<i>${vm.ip}</i>`;
+      const validIp = vm.ip && vm.ip !== '{}' && vm.ip !== 'null';
+
+      let displayIp = validIp ? vm.ip : vm.state;
+      if (!isUp && validIp) displayIp = `<i>${vm.ip}</i>`;
 
       return `
-        <div class="vm-row" data-vm-name="${vm.name.toLowerCase()}" data-vm-ip="${(vm.ip || '').toLowerCase()}">
+        <div class="vm-row" data-vm-name="${vm.name.toLowerCase()}" data-vm-ip="${validIp ? vm.ip.toLowerCase() : ''}">
           <div class="vm-info">
             <span class="status-dot ${isUp ? 'up' : 'down'}"></span>
             <span class="vm-name">${vm.name}</span>
@@ -144,7 +147,8 @@ async function loadHosts() {
 
       <div class="stats-grid">
         <div class="stat-item">
-          <div class="stat-header"><span>CPU</span><span class="stat-val">${cpuPct}%</span></div>
+          <div class="stat-header"><span>CPU</span></div>
+          <div class="stat-header"><span class="stat-val">${cpuPct}%</span></div>
           <div class="progress-bg"><div class="progress-fill ${getProgressColor(cpuPct)}" style="width: ${cpuPct}%"></div></div>
         </div>
         <div class="stat-item">
@@ -153,7 +157,8 @@ async function loadHosts() {
           <div class="progress-bg"><div class="progress-fill ${getProgressColor(memPct)}" style="width: ${memPct}%"></div></div>
         </div>
         <div class="stat-item">
-          <div class="stat-header"><span>DISK</span><span class="stat-val">${diskStr}</span></div>
+          <div class="stat-header"><span>DISK</span></div>
+          <div class="stat-header"><span class="stat-val">${diskStr}</span></div>
           <div class="progress-bg"><div class="progress-fill ${getProgressColor(diskPct)}" style="width: ${diskPct}%"></div></div>
         </div>
       </div>
@@ -182,11 +187,11 @@ document.getElementById('global-search').addEventListener('input', (e) => {
     let hasVisibleVm = false;
 
     card.querySelectorAll('.vm-row').forEach(row => {
-      const vmName = row.dataset.vmName;
-      if (!vmName) return; // Sécurité si "Aucune VM"
+      const vmName = row.dataset.vmName || "";
+      const vmIp = row.dataset.vmIp || "";
 
-      // Si la VM matche la recherche OU si l'hôte matche (dans ce cas on affiche toutes les VMs de cet hôte)
-      if (vmName.includes(val) || hostMatch) {
+      // La condition vérifie maintenant le nom OU l'IP de la VM
+      if (vmName.includes(val) || vmIp.includes(val) || hostMatch) {
         row.style.display = '';
         hasVisibleVm = true;
       } else {

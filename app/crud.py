@@ -29,8 +29,8 @@ def upsert_vm(db: Session, host_id: int, name: str, ip: str | None, guest_hostna
         vm = models.VM(host_id=host_id, name=name)
         db.add(vm)
 
-    # Ne met à jour l'IP que si on en a détecté une nouvelle
-    if ip is not None:
+    # Ne met à jour l'IP que si elle est vraiment valide
+    if ip is not None and ip != "{}" and ip != "null" and ip.strip() != "":
         vm.ip = ip
 
     vm.guest_hostname = guest_hostname
