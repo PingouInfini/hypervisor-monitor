@@ -84,6 +84,7 @@ def collect_once_sync(hosts: List[str] | None = None):
                         name=name,
                         ip=ip,
                         guest_hostname=vm.get("vm_hostname"),
+                        fqdn=vm.get('fqdn'),
                         ram_mb=vm.get("ram_mb"),
                         total_vhd_gb=vm.get("total_vhd_gb"),
                         total_vhd_file_gb=vm.get("total_vhd_file_gb"),

@@ -7,6 +7,7 @@ class VMBase(BaseModel):
     host_id: int
     name: str
     guest_hostname: Optional[str] = None
+    fqdn: Optional[str] = None
     ip: Optional[str] = None
     ram_mb: Optional[int] = None
     total_vhd_gb: Optional[float] = None

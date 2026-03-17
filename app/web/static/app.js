@@ -55,6 +55,7 @@ async function loadVMs() {
       <td>${statusHtml} &nbsp; ${vm.name}</td>
       <td>${vm.guest_hostname || '<span class="text-muted">—</span>'}</td>
       <td>${displayIp}</td>
+      <td>${vm.fqdn || '<span class="text-muted">—</span>'}</td>
       <td>${vm.ram_mb ? vm.ram_mb : '—'}</td>
       <td>${vm.total_vhd_gb ? vm.total_vhd_gb : '—'}</td>
       <td>${vm.total_vhd_file_gb ? vm.total_vhd_file_gb : '—'}</td>

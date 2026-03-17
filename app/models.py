@@ -26,6 +26,7 @@ class VM(Base):
     name: Mapped[str] = mapped_column(String, index=True)
     guest_hostname: Mapped[str | None] = mapped_column(String, nullable=True)
     ip: Mapped[str | None] = mapped_column(String, nullable=True)
+    fqdn: Mapped[str | None] = mapped_column(String, nullable=True)
     ram_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_vhd_gb: Mapped[float | None] = mapped_column(Float, nullable=True)
     total_vhd_file_gb: Mapped[float | None] = mapped_column(Float, nullable=True)

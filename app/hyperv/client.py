@@ -41,7 +41,6 @@ class HyperVClient:
         return json.loads(text) if text else {}
 
     def collect(self) -> Dict[str, Any]:
-        # PowerShell script minifié SANS accents pour éviter les erreurs d'encodage WinRM
         ps = r'''
 $ProgressPreference='SilentlyContinue'
 $ErrorActionPreference='SilentlyContinue'
@@ -60,14 +59,15 @@ $vms=Get-VM|%{
  $safeName=$vm.Name -replace '\[','*' -replace '\]','*'
  $ip=$null
  try{$adp=Get-VMNetworkAdapter -VMName $safeName;$ip=$adp.IPAddresses|?{$_ -match '^\d{1,3}(\.\d{1,3}){3}$' -and $_ -notlike '169.*'}|Select -First 1}catch{}
- $vmHost=$null;$vmDom=$null;$vmDns=@()
- try{$kvp=Get-VMIntegrationService -VMName $safeName|?{$_.Name -match 'Key-Value|change de paires'};if($kvp -and $kvp.Enabled){$items=Get-VMKeyValuePair -VMName $safeName -Source Guest;$vmHost=($items|?{$_.Name -eq "HostName"}).Value;$vmDom=($items|?{$_.Name -eq "DomainName" -or $_.Name -eq "FullyQualifiedDomainName"}).Value;$vmDns=($items|?{$_.Name -eq "NameServer"}).Value -split ','}}catch{}
+ $vmHost=$null;$vmFqdn=$null;$vmDns=@()
+ try{$kvp=Get-VMIntegrationService -VMName $safeName|?{$_.Name -match 'Key-Value|change de paires'};if($kvp -and $kvp.Enabled){$items=Get-VMKeyValuePair -VMName $safeName -Source Guest;$vmHost=($items|?{$_.Name -eq "HostName"}).Value;$vmFqdn=($items|?{$_.Name -eq "FullyQualifiedDomainName"}).Value;$vmDns=($items|?{$_.Name -eq "NameServer"}).Value -split ','}}catch{}
  if(-not $vmHost -and $ip){try{$vmHost=[System.Net.Dns]::GetHostEntry($ip).HostName}catch{}}
+ if(-not $vmFqdn -and $vmHost){$vmFqdn=$vmHost}
  $vhdInfo=@()
  try{$vhdInfo=Get-VMHardDiskDrive -VMName $safeName|%{ $vhd=Get-VHD -Path $_.Path;[pscustomobject]@{Path=$vhd.Path;Size=[int64]$vhd.Size;FileSize=[int64]$vhd.FileSize}}}catch{}
  $totVhd=if($vhdInfo){[math]::Round((($vhdInfo|Measure -Property Size -Sum).Sum)/1GB,2)}else{$null}
  $totVhdFile=if($vhdInfo){[math]::Round((($vhdInfo|Measure -Property FileSize -Sum).Sum)/1GB,2)}else{$null}
- [pscustomobject]@{name=$vm.Name;state=$vm.State.ToString();vm_hostname=$vmHost;vm_domain=$vmDom;dns_servers=$vmDns;ip=$ip;ram_mb=[int]($vm.MemoryStartup/1MB);total_vhd_gb=$totVhd;total_vhd_file_gb=$totVhdFile}
+ [pscustomobject]@{name=$vm.Name;state=$vm.State.ToString();vm_hostname=$vmHost;fqdn=$vmFqdn;dns_servers=$vmDns;ip=$ip;ram_mb=[int]($vm.MemoryStartup/1MB);total_vhd_gb=$totVhd;total_vhd_file_gb=$totVhdFile}
 }
 [pscustomobject]@{host_name=$hostName;host_ip=$hostIP;host_cpu_pct=$cpuUsage;host_free_mem_mb=$freeMemMB;host_total_mem_mb=$totalMemMB;host_free_disk_gb=$freeDiskGB;host_total_disk_gb=$totalDiskGB;vms=$vms}|ConvertTo-Json -Depth 6
 '''
