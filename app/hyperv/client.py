@@ -59,20 +59,46 @@ $vms=Get-VM|%{
  $safeName=$vm.Name -replace '\[','*' -replace '\]','*'
  $ip=$null
  try{$adp=Get-VMNetworkAdapter -VMName $safeName;$ip=$adp.IPAddresses|?{$_ -match '^\d{1,3}(\.\d{1,3}){3}$' -and $_ -notlike '169.*'}|Select -First 1}catch{}
- $vmHost=$null;$vmFqdn=$null;$vmDns=@()
- try{$kvp=Get-VMIntegrationService -VMName $safeName|?{$_.Name -match 'Key-Value|change de paires'};if($kvp -and $kvp.Enabled){$items=Get-VMKeyValuePair -VMName $safeName -Source Guest;$vmHost=($items|?{$_.Name -eq "HostName"}).Value;$vmFqdn=($items|?{$_.Name -eq "FullyQualifiedDomainName"}).Value;$vmDns=($items|?{$_.Name -eq "NameServer"}).Value -split ','}}catch{}
- if(-not $vmHost -and $ip){try{$vmHost=[System.Net.Dns]::GetHostEntry($ip).HostName}catch{}}
- if(-not $vmFqdn -and $vmHost){$vmFqdn=$vmHost}
+ 
+ $rawHost=$null;$rawFqdn=$null;$vmDns=@()
+ try{
+  $kvp=Get-VMIntegrationService -VMName $safeName|?{$_.Name -match 'Key-Value|change de paires'}
+  if($kvp -and $kvp.Enabled){
+   $items=Get-VMKeyValuePair -VMName $safeName -Source Guest
+   $rawHost=($items|?{$_.Name -eq "HostName"}).Value
+   $rawFqdn=($items|?{$_.Name -eq "FullyQualifiedDomainName"}).Value
+   $vmDns=($items|?{$_.Name -eq "NameServer"}).Value -split ','
+  }
+ }catch{}
+ 
+ # Reverse DNS uniquement si on n'a absolument rien eu via KVP
+ if(-not $rawHost -and -not $rawFqdn -and $ip){try{$rawFqdn=[System.Net.Dns]::GetHostEntry($ip).HostName}catch{}}
+ 
+ $vmHost=$null;$vmFqdn=$null
+ # Logique de séparation stricte Hostname court / FQDN
+ if($rawFqdn){
+  $vmFqdn=$rawFqdn
+  $vmHost=$rawFqdn.Split('.')[0]
+ }elseif($rawHost){
+  if($rawHost -match '\.'){
+   $vmFqdn=$rawHost
+   $vmHost=$rawHost.Split('.')[0]
+  }else{
+   $vmHost=$rawHost
+   $vmFqdn=$rawHost
+  }
+ }
+ 
  $vhdInfo=@()
  try{$vhdInfo=Get-VMHardDiskDrive -VMName $safeName|%{ $vhd=Get-VHD -Path $_.Path;[pscustomobject]@{Path=$vhd.Path;Size=[int64]$vhd.Size;FileSize=[int64]$vhd.FileSize}}}catch{}
  $totVhd=if($vhdInfo){[math]::Round((($vhdInfo|Measure -Property Size -Sum).Sum)/1GB,2)}else{$null}
  $totVhdFile=if($vhdInfo){[math]::Round((($vhdInfo|Measure -Property FileSize -Sum).Sum)/1GB,2)}else{$null}
+ 
  [pscustomobject]@{name=$vm.Name;state=$vm.State.ToString();vm_hostname=$vmHost;fqdn=$vmFqdn;dns_servers=$vmDns;ip=$ip;ram_mb=[int]($vm.MemoryStartup/1MB);total_vhd_gb=$totVhd;total_vhd_file_gb=$totVhdFile}
 }
 [pscustomobject]@{host_name=$hostName;host_ip=$hostIP;host_cpu_pct=$cpuUsage;host_free_mem_mb=$freeMemMB;host_total_mem_mb=$totalMemMB;host_free_disk_gb=$freeDiskGB;host_total_disk_gb=$totalDiskGB;vms=$vms}|ConvertTo-Json -Depth 6
 '''
         return self._run_ps_json(ps)
-
 
 def demo_parse():
     # Helper for unit tests; not used in production path
