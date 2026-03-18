@@ -120,3 +120,44 @@ table.dataTable.display > tbody > tr > .sorting_1,
 table.dataTable.order-column.stripe > tbody > tr > .sorting_1 {
   box-shadow: none !important;
 }
+
+/* ---- INTERACTIONS & SURBRILLANCE ---- */
+@keyframes highlightPulse {
+  0% {
+    box-shadow: 0 0 0 0px rgba(0, 123, 255, 0.8);
+    outline: 2px solid rgba(0, 123, 255, 1);
+  }
+  100% {
+    box-shadow: 0 0 0 15px rgba(0, 123, 255, 0);
+    outline: 2px solid transparent;
+  }
+}
+
+.highlight-target {
+  animation: highlightPulse 2s ease-out;
+  border-radius: 6px;
+  position: relative;
+  z-index: 10;
+}
+
+/* Rendre le nom de l'hôte cliquable dans le tableau */
+.link-text {
+  color: #3b82f6; /* Bleu clair adapté au thème dark */
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: bold;
+}
+.link-text:hover {
+  text-decoration: underline;
+  filter: brightness(1.2);
+}
+
+/* Rendre les lignes de VM cliquables dans les cartes Host */
+.vm-row.clickable {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.vm-row.clickable:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}

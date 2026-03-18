@@ -32,6 +32,47 @@ function getProgressColor(pct) {
   return '';
 }
 
+// ---- NAVIGATION CROISÉE (FOCUS) ----
+window.focusVM = function(vmName) {
+  // 1. Basculer sur l'onglet VMs
+  document.getElementById('tab-vms').click();
+
+  // 2. Remplir la barre de recherche globale pour isoler la VM
+  const search = document.getElementById('global-search');
+  search.value = vmName;
+  search.dispatchEvent(new Event('input')); // Déclenche la recherche
+
+  // 3. Appliquer la surbrillance sur la ligne du tableau
+  setTimeout(() => {
+    // DataTables réécrit le DOM, on prend la première ligne du corps
+    const tr = document.querySelector('#vms-body tr');
+    if (tr && !tr.querySelector('.dataTables_empty')) {
+      tr.classList.add('highlight-target');
+      setTimeout(() => tr.classList.remove('highlight-target'), 2000);
+    }
+  }, 100);
+};
+
+window.focusHost = function(hostName) {
+  // 1. Basculer sur l'onglet Hosts
+  document.getElementById('tab-hosts').click();
+
+  // 2. Vider la barre de recherche pour être sûr de voir l'hôte
+  const search = document.getElementById('global-search');
+  search.value = '';
+  search.dispatchEvent(new Event('input'));
+
+  // 3. Scroller vers la carte et la mettre en surbrillance
+  setTimeout(() => {
+    const card = document.querySelector(`.host-card[data-host-name="${hostName.toLowerCase()}"]`);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.classList.add('highlight-target');
+      setTimeout(() => card.classList.remove('highlight-target'), 2000);
+    }
+  }, 100);
+};
+
 // ---- LOAD VMS (Style Dozzle) ----
 async function loadVMs() {
   const data = await fetchJSON('/api/vms');
@@ -70,7 +111,9 @@ async function loadVMs() {
   hosts.forEach(h => hostMap[h.id] = h.name);
   document.querySelectorAll('#vms-body .host-name').forEach(td => {
     const hid = parseInt(td.dataset.hostId, 10);
-    td.textContent = hostMap[hid] || hid;
+    const hName = hostMap[hid] || hid;
+    // On rend le nom cliquable
+    td.innerHTML = `<span class="link-text" onclick="focusHost('${hName}')" title="Voir la carte de cet hôte">${hName}</span>`;
   });
 
   if (window._dt) window._dt.destroy();
@@ -104,7 +147,7 @@ async function loadHosts() {
       if (!isUp && validIp) displayIp = `<i>${vm.ip}</i>`;
 
       return `
-        <div class="vm-row" data-vm-name="${vm.name.toLowerCase()}" data-vm-ip="${validIp ? vm.ip.toLowerCase() : ''}">
+        <div class="vm-row clickable" data-vm-name="${vm.name.toLowerCase()}" data-vm-ip="${validIp ? vm.ip.toLowerCase() : ''}" onclick="focusVM('${vm.name}')" title="Chercher cette VM dans le tableau">
           <div class="vm-info">
             <span class="status-dot ${isUp ? 'up' : 'down'}"></span>
             <span class="vm-name">${vm.name}</span>
