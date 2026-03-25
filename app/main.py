@@ -1,17 +1,34 @@
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Depends, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
+from sqlalchemy.orm import Session
 
-from .db import Base, engine, SessionLocal
+from app.config import settings
 from . import models, schemas
+from .db import Base, engine, SessionLocal
 from .polling import polling_loop, collect_once
 
-import asyncio
+# On garde une référence forte pour la tâche de fond (évite le garbage collection)
+background_tasks = set()
 
-app = FastAPI(title="Hyper-V Monitor")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Démarrage : Lancer la boucle de polling
+    task = asyncio.create_task(polling_loop())
+    background_tasks.add(task)
+    task.add_done_callback(background_tasks.discard)
+    yield
+    # Arrêt : Nettoyer la tâche
+    task.cancel()
+
+
+app = FastAPI(title="Hypervisor Monitor", lifespan=lifespan)
 
 # DB init
 Base.metadata.create_all(bind=engine)
@@ -20,6 +37,7 @@ Base.metadata.create_all(bind=engine)
 app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
 templates = Jinja2Templates(directory="app/web/templates")
 
+
 def get_db():
     db = SessionLocal()
     try:
@@ -27,10 +45,6 @@ def get_db():
     finally:
         db.close()
 
-@app.on_event("startup")
-async def startup_event():
-    # Lancer la boucle de polling en tâche de fond
-    asyncio.create_task(polling_loop())
 
 # ---- API ----
 
@@ -38,6 +52,7 @@ async def startup_event():
 def api_hosts(db: Session = Depends(get_db)):
     rows = db.execute(select(models.Host)).scalars().all()
     return rows
+
 
 @app.get("/api/hosts/{host_id}", response_model=schemas.HostWithVMs)
 def api_host_detail(host_id: int, db: Session = Depends(get_db)):
@@ -48,15 +63,18 @@ def api_host_detail(host_id: int, db: Session = Depends(get_db)):
     _ = host.vms
     return host
 
+
 @app.get("/api/vms", response_model=list[schemas.VMBase])
 def api_vms(db: Session = Depends(get_db)):
     rows = db.execute(select(models.VM)).scalars().all()
     return rows
 
+
 @app.get("/api/vms/{vm_id}", response_model=schemas.VMBase)
 def api_vm_detail(vm_id: int, db: Session = Depends(get_db)):
     vm = db.get(models.VM, vm_id)
     return vm
+
 
 @app.delete("/api/hosts/{host_id}")
 def delete_host(host_id: int, db: Session = Depends(get_db)):
@@ -70,18 +88,28 @@ def delete_host(host_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "ok"}
 
+
 @app.post("/api/refresh")
 async def refresh_data():
     # On force la collecte et on ATTEND la fin avant de répondre au front-end
     await collect_once()
     return {"status": "ok"}
 
+
+@app.get("/api/config/tags")
+def api_tags():
+    # Convertit les modèles Pydantic en dict pour le JSON
+    return {k: {"bg": v.bg, "text": v.text} for k, v in settings.tag_colors.items()}
+
+
 # ---- UI ----
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="index.html", context={"request": request})
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("app.main:app", host="0.0.0.0", port=27888, reload=True)

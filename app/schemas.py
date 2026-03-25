@@ -1,6 +1,8 @@
-from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, List
+
+from pydantic import BaseModel
+
 
 class VMBase(BaseModel):
     id: int
@@ -18,19 +20,23 @@ class VMBase(BaseModel):
     class Config:
         from_attributes = True
 
+
 class HostBase(BaseModel):
     id: int
     name: str
     ip: Optional[str] = None
+    type: Optional[str] = None
+    tags: Optional[List[str]] = []
     free_disk_gb: Optional[float] = None
     free_mem_mb: Optional[int] = None
     last_seen: Optional[datetime] = None
-    cpu_usage_pct: Optional[int] = None
+    cpu_usage_pct: Optional[float] = None
     total_disk_gb: Optional[float] = None
     total_mem_mb: Optional[int] = None
 
     class Config:
         from_attributes = True
+
 
 class HostWithVMs(HostBase):
     vms: List[VMBase] = []

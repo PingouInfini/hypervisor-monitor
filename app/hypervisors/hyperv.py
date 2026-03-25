@@ -1,44 +1,63 @@
-from __future__ import annotations
-
 import json
 import re
-from dataclasses import dataclass
+import socket
 from typing import Any, Dict
 
-import winrm  # pywinrm
+import winrm
+from ..config import settings
+from .base import BaseClient
 
+class HyperVClient(BaseClient):
+    def __init__(self, host_config):
+        super().__init__(host_config)
 
-@dataclass
-class WinRMConfig:
-    username: str
-    password: str
-    use_ssl: bool = False
-    port: int = 5985
-    verify_ssl: bool = False
+        # Priorité aux identifiants spécifiques du host, sinon paramètres globaux
+        user = self.config.username or settings.winrm_username
+        pwd = self.config.password or settings.winrm_password
 
+        protocol = "https" if settings.winrm_use_ssl else "http"
+        self.url = f"{protocol}://{self.host_ip}:{settings.winrm_port}/wsman"
 
-class HyperVClient:
-    def __init__(self, host: str, cfg: WinRMConfig):
-        self.host = host
-        self.cfg = cfg
-        protocol = "https" if cfg.use_ssl else "http"
-        self.url = f"{protocol}://{host}:{cfg.port}/wsman"
+        #self.session = winrm.Session(
+        #    self.url,
+        #    auth=(user, pwd),
+        #    server_cert_validation=("validate" if settings.winrm_verify_ssl else "ignore"),
+        #    transport='credssp',
+        #    operation_timeout_sec=10,
+        #    read_timeout_sec=15
+        #)
+
         self.session = winrm.Session(
             self.url,
-            auth=(cfg.username, cfg.password),
-            server_cert_validation=("validate" if cfg.verify_ssl else "ignore"),
-            transport='credssp',
+            auth=(user, pwd),
+            transport='ntlm',
+            server_cert_validation="ignore"
         )
 
     def _run_ps_json(self, script: str) -> Dict[str, Any]:
-        r = self.session.run_ps(script)
-        if r.status_code != 0:
-            raise RuntimeError(f"PowerShell error ({r.status_code}): {r.std_err.decode(errors='ignore')}")
-        raw = r.std_out.decode(errors="ignore").strip()
-        # Strip any BOM or stray text, keep last JSON object if multiple
-        m = re.findall(r'\{.*\}|\[.*\]', raw, re.S)
-        text = raw if not m else m[-1]
-        return json.loads(text) if text else {}
+        # On sauvegarde le timeout par défaut (généralement None, soit infini)
+        default_timeout = socket.getdefaulttimeout()
+
+        try:
+            # On force un timeout brutal de 15 secondes au niveau de la carte réseau
+            # Ça tuera la requête même si credssp ou WMI bloque.
+            socket.setdefaulttimeout(15.0)
+
+            r = self.session.run_ps(script)
+
+            if r.status_code != 0:
+                raise RuntimeError(f"PowerShell error ({r.status_code}): {r.std_err.decode(errors='ignore')}")
+
+            raw = r.std_out.decode(errors="ignore").strip()
+            m = re.findall(r'\{.*}|\[.*]', raw, re.S)
+            text = raw if not m else m[-1]
+            return json.loads(text) if text else {}
+
+        except socket.timeout:
+            raise TimeoutError("Le serveur Hyper-V n'a pas répondu (Socket Timeout).")
+        finally:
+            # On restaure le timeout par défaut pour ne pas impacter le reste de l'application
+            socket.setdefaulttimeout(default_timeout)
 
     def collect(self) -> Dict[str, Any]:
         ps = r'''
@@ -75,12 +94,7 @@ $vms=Get-VM|%{
  $vmHost=if($rawHost){$rawHost.Split('.')[0]}else{$vm.Name}
  $trueDomain=$null
  
- if($vm.State -eq 'Running'){
-  try{
-   $trueDomain=Invoke-Command -VMId $vm.Id -ScriptBlock {(Get-CimInstance Win32_ComputerSystem).Domain} -ErrorAction Stop
-   if($trueDomain){ $trueDomain=([string]$trueDomain).Trim() }
-  }catch{}
- }
+
  
  $vmFqdn=$null
  if($trueDomain -and $trueDomain -notmatch 'WORKGROUP|^\s*$'){

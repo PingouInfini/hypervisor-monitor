@@ -1,5 +1,5 @@
 services:
-  hyperv-monitor:
-    image: pingouinfinihub/hyperv-monitor:latest
-    container_name: hyperv-monitor
+  hypervisor-monitor:
+    image: pingouinfinihub/hypervisor-monitor:latest
+    container_name: hypervisor-monitor
     build: .

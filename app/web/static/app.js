@@ -22,8 +22,22 @@ async function fetchJSON(url) {
 
 function fmtDate(s) {
   if (!s) return 'Jamais';
-  const d = new Date(s);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // On s'assure que la date est interprétée comme de l'UTC
+  // Si Python renvoie "2026-04-01T10:00:00" sans fuseau, on ajoute le 'Z'
+  let dateString = s;
+  if (!dateString.endsWith('Z') && !dateString.includes('+')) {
+    dateString += 'Z';
+  }
+
+  const d = new Date(dateString);
+
+  // On force l'affichage à l'heure de Paris
+  return d.toLocaleTimeString('fr-FR', {
+    timeZone: 'Europe/Paris',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }
 
 function getProgressColor(pct) {
@@ -74,6 +88,8 @@ window.focusHost = function(hostName) {
 };
 
 // ---- LOAD VMS (Style Dozzle) ----
+window.tagColors = {};
+
 async function loadVMs() {
   const data = await fetchJSON('/api/vms');
   const tbody = document.getElementById('vms-body');
@@ -157,6 +173,17 @@ async function loadHosts() {
       `;
     }).join('');
 
+    let tagsHtml = '';
+    if (h.tags && h.tags.length > 0) {
+      tagsHtml = '<div class="host-tags">';
+      h.tags.forEach(t => {
+        // Fallback si le tag n'est pas défini dans le .env
+        const colorDef = window.tagColors[t] || { bg: '#334155', text: '#f8fafc' };
+        tagsHtml += `<span class="tag-badge" style="background-color: ${colorDef.bg}; color: ${colorDef.text};">${t}</span>`;
+      });
+      tagsHtml += '</div>';
+    }
+
     // Calculs pourcentages
     const cpuPct = h.cpu_usage_pct || 0;
 
@@ -185,7 +212,7 @@ async function loadHosts() {
       <div class="host-header">
         <div>
           <h3>🖥️ ${h.name}</h3>
-          <div class="host-meta">${h.ip || 'IP Inconnue'} • Vu: ${fmtDate(h.last_seen)}</div>
+          ${tagsHtml} <div class="host-meta">${h.ip || 'IP Inconnue'} • Vu: ${fmtDate(h.last_seen)}</div>
         </div>
       </div>
 
@@ -315,5 +342,22 @@ document.getElementById('refresh-btn').addEventListener('click', async (e) => {
 });
 
 window.addEventListener('load', async () => {
+  // On récupère les couleurs des tags au chargement
+  try {
+    window.tagColors = await fetchJSON('/api/config/tags');
+  } catch(e) {
+    console.warn("Impossible de charger les couleurs des tags", e);
+  }
   await Promise.all([loadVMs(), loadHosts()]);
+
+  // Auto-actualisation silencieuse ----
+  // Rafraîchit l'IHM toutes les 60 secondes (60000 millisecondes)
+  setInterval(async () => {
+    // On recharge les données en fond
+    await Promise.all([loadVMs(), loadHosts()]);
+
+    // On relance l'événement de recherche pour réappliquer le filtre
+    // au cas où l'utilisateur était en train de chercher quelque chose
+    document.getElementById('global-search').dispatchEvent(new Event('input'));
+  }, 60000);
 });
