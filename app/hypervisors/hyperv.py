@@ -1,32 +1,28 @@
-from __future__ import annotations
-
 import json
 import re
-from dataclasses import dataclass
 from typing import Any, Dict
 
-import winrm  # pywinrm
+import winrm
+from ..config import settings
+
+from .base import BaseClient
 
 
-@dataclass
-class WinRMConfig:
-    username: str
-    password: str
-    use_ssl: bool = False
-    port: int = 5985
-    verify_ssl: bool = False
+class HyperVClient(BaseClient):
+    def __init__(self, host_config):
+        super().__init__(host_config)
 
+        # Priorité aux identifiants spécifiques du host, sinon paramètres globaux
+        user = self.config.username or settings.winrm_username
+        pwd = self.config.password or settings.winrm_password
 
-class HyperVClient:
-    def __init__(self, host: str, cfg: WinRMConfig):
-        self.host = host
-        self.cfg = cfg
-        protocol = "https" if cfg.use_ssl else "http"
-        self.url = f"{protocol}://{host}:{cfg.port}/wsman"
+        protocol = "https" if settings.winrm_use_ssl else "http"
+        self.url = f"{protocol}://{self.host_ip}:{settings.winrm_port}/wsman"
+
         self.session = winrm.Session(
             self.url,
-            auth=(cfg.username, cfg.password),
-            server_cert_validation=("validate" if cfg.verify_ssl else "ignore"),
+            auth=(user, pwd),
+            server_cert_validation=("validate" if settings.winrm_verify_ssl else "ignore"),
             transport='credssp',
         )
 
@@ -35,12 +31,12 @@ class HyperVClient:
         if r.status_code != 0:
             raise RuntimeError(f"PowerShell error ({r.status_code}): {r.std_err.decode(errors='ignore')}")
         raw = r.std_out.decode(errors="ignore").strip()
-        # Strip any BOM or stray text, keep last JSON object if multiple
-        m = re.findall(r'\{.*\}|\[.*\]', raw, re.S)
+        m = re.findall(r'\{.*}|\[.*]', raw, re.S)
         text = raw if not m else m[-1]
         return json.loads(text) if text else {}
 
     def collect(self) -> Dict[str, Any]:
+        # Copie exactement le script PowerShell "ps = r''' ... '''" que tu as dans ton client.py actuel ici.
         ps = r'''
 $ProgressPreference='SilentlyContinue'
 $ErrorActionPreference='SilentlyContinue'

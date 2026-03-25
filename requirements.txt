@@ -1,4 +1,4 @@
-fastapi==0.135.1
+fastapi==0.135.2
 uvicorn[standard]==0.42.0
 sqlalchemy==2.0.48
 pydantic==2.12.5
@@ -9,3 +9,6 @@ pywinrm==0.5.0
 orjson==3.11.7
 httpx==0.28.1
 pywinrm[credssp]==0.5.0
+proxmoxer==2.3.0
+requests==2.33.0
+pyvmomi==9.0.0.0

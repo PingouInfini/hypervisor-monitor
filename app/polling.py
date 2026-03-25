@@ -10,7 +10,7 @@ from . import models
 from .config import settings
 from .crud import upsert_host, upsert_vm
 from .db import SessionLocal
-from .hyperv.client import HyperVClient, WinRMConfig
+from .hypervisors import get_client
 
 # --- Logger setup ---
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -21,53 +21,48 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def get_client(host: str) -> HyperVClient:
-    cfg = WinRMConfig(
-        username=settings.winrm_username,
-        password=settings.winrm_password,
-        use_ssl=settings.winrm_use_ssl,
-        port=settings.winrm_port,
-        verify_ssl=settings.winrm_verify_ssl,
-    )
-    return HyperVClient(host, cfg)
+def collect_once_sync(hosts_config=None):
+    if hosts_config is None:
+        hosts_config = settings.hosts_config  # C'est maintenant une liste d'objets HostConfig
 
-
-def collect_once_sync(hosts: List[str] | None = None):
-    """Version synchrone : appelée dans un thread via asyncio.to_thread"""
-    if hosts is None:
-        hosts = settings.hosts
-    for h in hosts:
-        logger.debug(f"Collecting metrics from host {h}...")
+    for h_conf in hosts_config:
+        logger.debug(f"Collecting metrics from {h_conf.type} host {h_conf.ip}...")
         try:
-            client = get_client(h)
+            client = get_client(h_conf)
             data = client.collect()
-            logger.debug(f"Successfully connected to {h}")
+            logger.debug(f"Successfully connected to {h_conf.ip}")
         except Exception as e:
-            logger.error(f"Failed to collect from host {h}: {e}")
-            # On échec, on persiste au moins le host avec valeurs nulles
+            logger.error(f"Failed to collect from host {h_conf.ip}: {e}")
             db = SessionLocal()
             try:
-                upsert_host(db, h, ip=None, free_disk_gb=None, free_mem_mb=None)
+                # On persiste le host même en cas d'échec
+                upsert_host(db, name=h_conf.ip, ip=h_conf.ip, free_disk_gb=None, free_mem_mb=None, htype=h_conf.type,
+                            tags=h_conf.tags)
             finally:
                 db.close()
             continue
 
         db = SessionLocal()
         try:
+            # Sécurité : Si l'API/Script ne remonte pas le hostname, on utilise l'IP
+            host_name = data.get("host_name") or h_conf.ip
+
             host_row = upsert_host(
                 db,
-                name=data.get("host_name"),
-                ip=data.get("host_ip"),
+                name=host_name,
+                ip=h_conf.ip,  # On force l'IP issue de la config pour être sûr
                 free_disk_gb=data.get("host_free_disk_gb"),
                 free_mem_mb=data.get("host_free_mem_mb"),
                 cpu_usage_pct=data.get("host_cpu_pct"),
                 total_disk_gb=data.get("host_total_disk_gb"),
                 total_mem_mb=data.get("host_total_mem_mb"),
+                htype=h_conf.type,
+                tags=h_conf.tags
             )
             vms = data.get("vms", [])
             seen_names = set()
             if vms:
-                logger.debug(f"Host {h}: found {len(vms)} VMs")
+                logger.debug(f"Host {h_conf}: found {len(vms)} VMs")
 
                 for vm in vms:
                     ip = vm.get("ip")
@@ -77,7 +72,7 @@ def collect_once_sync(hosts: List[str] | None = None):
                     name = vm.get("name")
                     seen_names.add(name)
 
-                    logger.debug(f"Processing VM '{vm.get('name')}' on host {h}")
+                    logger.debug(f"Processing VM '{vm.get('name')}' on host {h_conf}")
                     upsert_vm(
                         db,
                         host_id=host_row.id,
@@ -97,7 +92,7 @@ def collect_once_sync(hosts: List[str] | None = None):
                 db_vms = db.execute(q).scalars().all()
                 for db_vm in db_vms:
                     if db_vm.name not in seen_names:
-                        logger.info(f"Removing VM '{db_vm.name}' (no longer present on host {h})")
+                        logger.info(f"Removing VM '{db_vm.name}' (no longer present on host {h_conf})")
                         db.delete(db_vm)
 
             db.commit()

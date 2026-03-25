@@ -161,3 +161,21 @@ table.dataTable.order-column.stripe > tbody > tr > .sorting_1 {
   background-color: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
 }
+
+.host-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.tag-badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}

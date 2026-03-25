@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Variables à définir
-IMAGE_NAME=${1:-pingouinfinihub/hyperv-monitor}
-IMAGE_TAG=${2:-2.3.0}
+IMAGE_NAME=${1:-pingouinfinihub/hypervisor-monitor}
+IMAGE_TAG=${2:-3.0.0}
 
 # Construire l'image avec docker-compose
 docker-compose -f docker-compose.yml build

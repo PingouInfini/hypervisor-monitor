@@ -74,6 +74,8 @@ window.focusHost = function(hostName) {
 };
 
 // ---- LOAD VMS (Style Dozzle) ----
+window.tagColors = {};
+
 async function loadVMs() {
   const data = await fetchJSON('/api/vms');
   const tbody = document.getElementById('vms-body');
@@ -156,6 +158,17 @@ async function loadHosts() {
         </div>
       `;
     }).join('');
+
+    let tagsHtml = '';
+    if (h.tags && h.tags.length > 0) {
+      tagsHtml = '<div class="host-tags">';
+      h.tags.forEach(t => {
+        // Fallback si le tag n'est pas défini dans le .env
+        const colorDef = window.tagColors[t] || { bg: '#334155', text: '#f8fafc' };
+        tagsHtml += `<span class="tag-badge" style="background-color: ${colorDef.bg}; color: ${colorDef.text};">${t}</span>`;
+      });
+      tagsHtml += '</div>';
+    }
 
     // Calculs pourcentages
     const cpuPct = h.cpu_usage_pct || 0;
@@ -315,5 +328,11 @@ document.getElementById('refresh-btn').addEventListener('click', async (e) => {
 });
 
 window.addEventListener('load', async () => {
+  // On récupère les couleurs des tags au chargement
+  try {
+    window.tagColors = await fetchJSON('/api/config/tags');
+  } catch(e) {
+    console.warn("Impossible de charger les couleurs des tags", e);
+  }
   await Promise.all([loadVMs(), loadHosts()]);
 });
