@@ -45,11 +45,15 @@ class ESXiClient(BaseClient):
                             total_vhd_gb += f.size
                 total_vhd_gb = round(total_vhd_gb / 1073741824, 2)
 
+                # Extraction des notes VMware (annotation)
+                notes = vm.config.annotation if vm.config else None
+
                 vms_data.append({
                     "name": vm.name,
                     "state": state,
                     "ip": vm.guest.ipAddress if vm.guest else None,
                     "guest_hostname": vm.guest.hostName if vm.guest else None,
+                    "notes": notes,
                     "ram_mb": vm.config.hardware.memoryMB if vm.config else 0,
                     "total_vhd_gb": total_vhd_gb
                 })

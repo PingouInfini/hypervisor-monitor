@@ -88,30 +88,16 @@ $vms=Get-VM|%{
  }catch{}
  
  $rawHost=$kvpHash['HostName']
- $rawFqdn=$kvpHash['FullyQualifiedDomainName']
  $vmDns=if($kvpHash['NameServer']){$kvpHash['NameServer'] -split ','}else{@()}
- 
  $vmHost=if($rawHost){$rawHost.Split('.')[0]}else{$vm.Name}
- $trueDomain=$null
- 
-
- 
- $vmFqdn=$null
- if($trueDomain -and $trueDomain -notmatch 'WORKGROUP|^\s*$'){
-  $vmFqdn="$vmHost.$trueDomain"
- }elseif($rawFqdn -match '\.'){
-  $vmFqdn=$rawFqdn
-  $vmHost=$rawFqdn.Split('.')[0]
- }else{
-  $vmFqdn=$vmHost
- }
+ $vmNotes=$vm.Notes
  
  $vhdInfo=@()
  try{$vhdInfo=$vm|Get-VMHardDiskDrive|%{ $vhd=Get-VHD -Path $_.Path;[pscustomobject]@{Path=$vhd.Path;Size=[int64]$vhd.Size;FileSize=[int64]$vhd.FileSize}}}catch{}
  $totVhd=if($vhdInfo){[math]::Round((($vhdInfo|Measure -Property Size -Sum).Sum)/1GB,2)}else{$null}
  $totVhdFile=if($vhdInfo){[math]::Round((($vhdInfo|Measure -Property FileSize -Sum).Sum)/1GB,2)}else{$null}
  
- [pscustomobject]@{name=$vm.Name;state=$vm.State.ToString();vm_hostname=$vmHost;fqdn=$vmFqdn;dns_servers=$vmDns;ip=$ip;ram_mb=[int]($vm.MemoryStartup/1MB);total_vhd_gb=$totVhd;total_vhd_file_gb=$totVhdFile}
+ [pscustomobject]@{name=$vm.Name;state=$vm.State.ToString();vm_hostname=$vmHost;notes=$vmNotes;dns_servers=$vmDns;ip=$ip;ram_mb=[int]($vm.MemoryStartup/1MB);total_vhd_gb=$totVhd;total_vhd_file_gb=$totVhdFile}
 }
 [pscustomobject]@{host_name=$hostName;host_ip=$hostIP;host_cpu_pct=$cpuUsage;host_free_mem_mb=$freeMemMB;host_total_mem_mb=$totalMemMB;host_free_disk_gb=$freeDiskGB;host_total_disk_gb=$totalDiskGB;vms=$vms}|ConvertTo-Json -Depth 6
 '''

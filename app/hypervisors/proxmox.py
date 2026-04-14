@@ -35,11 +35,18 @@ class ProxmoxClient(BaseClient):
             vmid = vm.get('vmid')
             state = "Running" if vm.get('status') == 'running' else "Stopped"
 
+            # Récupération des notes (description) via la config de la VM
+            notes = None
+            try:
+                vm_config = proxmox.nodes(node).qemu(vmid).config.get()
+                notes = vm_config.get('description')
+            except Exception as e:
+                logger.debug(f"Impossible de récupérer les notes sur VM {vmid}: {e}")
+
             # Tentative de récupération de l'IP via QEMU Guest Agent
             ip_address = None
             if state == "Running":
                 try:
-                    # Nécessite que l'agent QEMU soit activé et fonctionnel
                     ifaces = proxmox.nodes(node).qemu(vmid).agent('network-get-interfaces').get()
                     for iface in ifaces.get('result', []):
                         for addr in iface.get('ip-addresses', []):
@@ -49,13 +56,13 @@ class ProxmoxClient(BaseClient):
                         if ip_address:
                             break
                 except Exception as e:
-                    # Agent non installé ou injoignable
                     logger.debug(f"Agent inactif ou injoignable sur VM {vmid}: {e}")
 
             vms_data.append({
                 "name": vm.get('name'),
                 "state": state,
                 "ip": ip_address,
+                "notes": notes,
                 "ram_mb": int(vm.get('maxmem', 0) / 1048576),
                 "total_vhd_gb": round(vm.get('maxdisk', 0) / 1073741824, 2)
             })

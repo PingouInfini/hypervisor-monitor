@@ -28,7 +28,7 @@ def upsert_host(db: Session, name: str, ip: str | None, free_disk_gb: float | No
 
 
 def upsert_vm(db: Session, host_id: int, name: str, ip: str | None, guest_hostname: str | None,
-              fqdn: str | None,
+              notes: str | None,
               ram_mb: int | None, total_vhd_gb: float | None, total_vhd_file_gb: float | None,
               state: str | None = None) -> models.VM:
     vm = db.execute(select(models.VM).where(models.VM.host_id == host_id, models.VM.name == name)).scalar_one_or_none()
@@ -40,7 +40,7 @@ def upsert_vm(db: Session, host_id: int, name: str, ip: str | None, guest_hostna
         vm.ip = ip
 
     vm.guest_hostname = guest_hostname
-    vm.fqdn = fqdn
+    vm.notes = notes
     vm.ram_mb = ram_mb
     vm.total_vhd_gb = total_vhd_gb
     vm.total_vhd_file_gb = total_vhd_file_gb

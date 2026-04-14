@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Integer, String, DateTime, ForeignKey, Float, UniqueConstraint, JSON
+from sqlalchemy import Integer, String, DateTime, ForeignKey, Float, UniqueConstraint, JSON, Text
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from .db import Base
@@ -32,7 +32,7 @@ class VM(Base):
     name: Mapped[str] = mapped_column(String, index=True)
     guest_hostname: Mapped[str | None] = mapped_column(String, nullable=True)
     ip: Mapped[str | None] = mapped_column(String, nullable=True)
-    fqdn: Mapped[str | None] = mapped_column(String, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     ram_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_vhd_gb: Mapped[float | None] = mapped_column(Float, nullable=True)
     total_vhd_file_gb: Mapped[float | None] = mapped_column(Float, nullable=True)

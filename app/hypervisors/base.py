@@ -11,6 +11,6 @@ class BaseClient(ABC):
         """
         Doit retourner un dictionnaire contenant :
         - host_name, host_ip, host_cpu_pct, host_free_mem_mb, host_total_mem_mb, tags...
-        - vms: liste de dictionnaires (name, state, ip, fqdn, ram_mb, etc.)
+        - vms: liste de dictionnaires (name, state, ip, notes, ram_mb, etc.)
         """
         pass

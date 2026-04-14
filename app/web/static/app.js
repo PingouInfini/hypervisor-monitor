@@ -96,12 +96,29 @@ async function loadVMs() {
     const displayIp = validIp ? (isUp ? vm.ip : `<i class="text-muted">${vm.ip}</i>`) : '<span class="text-muted">—</span>';
     const hName = hostMap[vm.host_id] || vm.host_id;
 
+    let notesHtml = '<span class="text-muted">—</span>';
+    if (vm.notes && vm.notes.trim() !== '') {
+      const lines = vm.notes.split('\n');
+      const firstLine = lines[0];
+      const hasMore = lines.length > 1;
+
+      // Encodage pour éviter que les guillemets ou retours à la ligne cassent l'attribut onclick
+      const encodedNotes = encodeURIComponent(vm.notes);
+
+      notesHtml = `
+      <div class="notes-preview" onclick="openNotesModal('${vm.name}', '${encodedNotes}')" title='${vm.notes}'>
+        <span class="notes-text">${firstLine}</span>
+        ${hasMore ? `<span class="notes-indicator" title="Contient plusieurs lignes">+${lines.length - 1}</span>` : ''}
+      </div>
+    `;
+    }
+
     return `
       <tr>
         <td>${statusHtml} &nbsp; ${vm.name}</td>
         <td>${vm.guest_hostname || '<span class="text-muted">—</span>'}</td>
         <td>${displayIp}</td>
-        <td>${vm.fqdn || '<span class="text-muted">—</span>'}</td>
+        <td style="max-width: 200px;">${notesHtml}</td>
         <td>${vm.ram_mb ? vm.ram_mb : '—'}</td>
         <td>${vm.total_vhd_gb ? vm.total_vhd_gb : '—'}</td>
         <td>${vm.total_vhd_file_gb ? vm.total_vhd_file_gb : '—'}</td>
@@ -375,3 +392,20 @@ window.addEventListener('load', async () => {
     await Promise.all([loadVMs(), loadHosts()]);
   }, 60000);
 });
+
+// ---- GESTION DE LA MODALE DES NOTES ----
+window.openNotesModal = function(vmName, encodedNotes) {
+  const notes = decodeURIComponent(encodedNotes);
+  document.getElementById('notes-modal-title').textContent = "Notes : " + vmName;
+  document.getElementById('notes-modal-content').textContent = notes; // Conserve nativement les sauts de ligne avec le CSS approprié
+
+  const modal = document.getElementById('notes-modal');
+  if (modal.showModal) modal.showModal();
+  else modal.setAttribute('open', '');
+};
+
+window.closeNotesModal = function() {
+  const modal = document.getElementById('notes-modal');
+  if (modal.close) modal.close();
+  else modal.removeAttribute('open');
+};
