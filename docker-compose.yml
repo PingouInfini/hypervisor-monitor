@@ -2,4 +2,7 @@ services:
   hypervisor-monitor:
     image: pingouinfinihub/hypervisor-monitor:latest
     container_name: hypervisor-monitor
-    build: .
+    build:
+      context: .
+      args:
+        - APP_VERSION=${APP_VERSION:-dev}

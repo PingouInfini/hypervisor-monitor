@@ -1,4 +1,5 @@
 import asyncio
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, Request, HTTPException
@@ -106,7 +107,8 @@ def api_tags():
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html", context={"request": request})
+    return templates.TemplateResponse(request=request, name="index.html",
+                                      context={"request": request, "version": os.getenv("APP_VERSION", "dev")})
 
 
 if __name__ == "__main__":

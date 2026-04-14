@@ -2,7 +2,9 @@
 
 # Variables à définir
 IMAGE_NAME=${1:-pingouinfinihub/hypervisor-monitor}
-IMAGE_TAG=${2:-3.1.0}
+IMAGE_TAG=${2:-3.2.0}
+
+export APP_VERSION=$IMAGE_TAG
 
 # Construire l'image avec docker-compose
 docker-compose -f docker-compose.yml build

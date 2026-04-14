@@ -48,7 +48,12 @@ class HyperVClient(BaseClient):
             if r.status_code != 0:
                 raise RuntimeError(f"PowerShell error ({r.status_code}): {r.std_err.decode(errors='ignore')}")
 
-            raw = r.std_out.decode(errors="ignore").strip()
+            try:
+                raw = r.std_out.decode('cp850').strip()
+            except UnicodeDecodeError:
+                # Fallback sur utf-8 si cp850 échoue
+                raw = r.std_out.decode('utf-8', errors='ignore').strip()
+
             m = re.findall(r'\{.*}|\[.*]', raw, re.S)
             text = raw if not m else m[-1]
             return json.loads(text) if text else {}
