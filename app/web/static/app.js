@@ -35,6 +35,16 @@ function fmtDate(s) {
   });
 }
 
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+}
+
 function getProgressColor(pct) {
   if (pct > 90) return 'danger';
   if (pct > 75) return 'warn';
@@ -103,11 +113,19 @@ async function loadVMs() {
       const hasMore = lines.length > 1;
 
       // Encodage pour éviter que les guillemets ou retours à la ligne cassent l'attribut onclick
-      const encodedNotes = encodeURIComponent(vm.notes);
+      const encodedNotes = encodeURIComponent(vm.notes).replace(/'/g, "%27");
 
+      // On encode aussi le nom de la VM au cas où il contiendrait une apostrophe
+      const encodedName = encodeURIComponent(vm.name).replace(/'/g, "%27");
+
+      // On échappe les caractères pour le HTML (affichage et attribut title)
+      const safeNotes = escapeHtml(vm.notes);
+      const safeFirstLine = escapeHtml(firstLine);
+
+      // On utilise des doubles guillemets pour le title, et safeNotes à l'intérieur
       notesHtml = `
-      <div class="notes-preview" onclick="openNotesModal('${vm.name}', '${encodedNotes}')" title='${vm.notes}'>
-        <span class="notes-text">${firstLine}</span>
+      <div class="notes-preview" onclick="openNotesModal('${encodedName}', '${encodedNotes}')" title="${safeNotes}">
+        <span class="notes-text">${safeFirstLine}</span>
         ${hasMore ? `<span class="notes-indicator" title="Contient plusieurs lignes">+${lines.length - 1}</span>` : ''}
       </div>
     `;
@@ -394,8 +412,11 @@ window.addEventListener('load', async () => {
 });
 
 // ---- GESTION DE LA MODALE DES NOTES ----
-window.openNotesModal = function(vmName, encodedNotes) {
+window.openNotesModal = function(encodedName, encodedNotes) {
+  // Décodage du nom et des notes
+  const vmName = decodeURIComponent(encodedName);
   const notes = decodeURIComponent(encodedNotes);
+
   document.getElementById('notes-modal-title').textContent = "Notes : " + vmName;
   document.getElementById('notes-modal-content').textContent = notes; // Conserve nativement les sauts de ligne avec le CSS approprié
 

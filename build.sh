@@ -2,7 +2,7 @@
 
 # Variables à définir
 IMAGE_NAME=${1:-pingouinfinihub/hypervisor-monitor}
-IMAGE_TAG=${2:-3.2.0}
+IMAGE_TAG=${2:-3.3.0}
 
 export APP_VERSION=$IMAGE_TAG
 
